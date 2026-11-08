@@ -12,10 +12,12 @@ final class Preferences {
   private enum Key {
     static let refreshIntervalSec = "refreshIntervalSec"
     static let disabledProviders = "disabledProviders"
+    static let notifyNearLimit = "notifyNearLimit"
   }
 
   @ObservationIgnored private let defaults: UserDefaults
   @ObservationIgnored var onIntervalChange: (() -> Void)?
+  @ObservationIgnored var onNotifyChange: (() -> Void)?
 
   // Omarchy's refreshIntervalSec: 900 by default, 30…3600.
   var refreshIntervalSec: Int {
@@ -33,11 +35,20 @@ final class Preferences {
     didSet { defaults.set(disabledProviders.sorted(), forKey: Key.disabledProviders) }
   }
 
+  // A notification when a window reaches 90%. On unless switched off.
+  var notifyNearLimit: Bool {
+    didSet {
+      defaults.set(notifyNearLimit, forKey: Key.notifyNearLimit)
+      if notifyNearLimit != oldValue { onNotifyChange?() }
+    }
+  }
+
   init(defaults: UserDefaults = .standard) {
     self.defaults = defaults
     let stored = defaults.integer(forKey: Key.refreshIntervalSec)
     refreshIntervalSec = stored == 0 ? 900 : min(max(stored, Self.intervalRange.lowerBound), Self.intervalRange.upperBound)
     disabledProviders = Set(defaults.stringArray(forKey: Key.disabledProviders) ?? [])
+    notifyNearLimit = defaults.object(forKey: Key.notifyNearLimit) as? Bool ?? true
   }
 
   func isEnabled(_ id: String) -> Bool { !disabledProviders.contains(id) }

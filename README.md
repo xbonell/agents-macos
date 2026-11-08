@@ -2,8 +2,8 @@
 
 A native macOS menu bar port of Omarchy's `omarchy.agents` panel: one robot
 in the menu bar, and a panel with each AI subscription's rate limits, reset
-times, and what your token counts add up to. First release: Claude Code,
-Codex, and Cursor.
+times, and what your token counts add up to: Claude Code, Codex, Cursor, and
+OpenCode (its own Zen/Go service; the card appears once you use it).
 
 ## How it works
 
@@ -13,7 +13,7 @@ that split:
 
 - **Collectors** are Omarchy's own, vendored unmodified in
   `Sources/Agents/Resources/collectors/` (`collectors.py` plus
-  `omarchy-agent-usage-{claude,codex,cursor}`). Their record format is
+  `omarchy-agent-usage-{claude,codex,cursor,opencode}`). Their record format is
   Omarchy's `docs/agent-usage-collectors.md`.
 - **`Resources/macos/run_collector.py`** runs one of them on macOS:
   it points `OMARCHY_PATH`, `XDG_STATE_HOME` and `XDG_CACHE_HOME` at the app's
@@ -62,7 +62,9 @@ scripts/build-app.sh --install  # and copy it to ~/Applications
 - **Sign In…** appears next to "Sign-in required" and opens your terminal
   running that CLI's login (`claude auth login`, `codex login`,
   `cursor-agent login`).
-- The robot turns **red** while any limit is at 90% or more.
+- The robot turns **red** while any limit is at 90% or more, and a
+  **notification** says so once per window (switch it off in Settings).
+  Clicking the notification opens the panel.
 
 Collector cache: `~/Library/Caches/Agents`. App logs:
 `log show --predicate 'subsystem == "Agents"' --last 1h`.

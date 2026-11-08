@@ -6,7 +6,7 @@ set -euo pipefail
 
 UPSTREAM="${1:-$HOME/Work/99.misc/omarchy}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)/Sources/Agents"
-PROVIDERS=(claude codex cursor)
+PROVIDERS=(claude codex cursor opencode)
 
 vendor="$ROOT/Resources/collectors"
 mkdir -p "$vendor/bin" "$vendor/shell/plugins/agents" "$ROOT/Resources/assets"

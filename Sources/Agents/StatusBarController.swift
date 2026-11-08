@@ -11,6 +11,7 @@ final class StatusBarController: NSObject {
   private let store: UsageStore
   private let scheduler: Scheduler
   private let prefs: Preferences
+  private let notifier: LimitNotifier
   private let login = LoginItem()
 
   private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -21,10 +22,11 @@ final class StatusBarController: NSObject {
   private var sizeObservation: NSKeyValueObservation?
   private var iconTimer: Timer?
 
-  init(store: UsageStore, scheduler: Scheduler, prefs: Preferences) {
+  init(store: UsageStore, scheduler: Scheduler, prefs: Preferences, notifier: LimitNotifier) {
     self.store = store
     self.scheduler = scheduler
     self.prefs = prefs
+    self.notifier = notifier
     super.init()
 
     if let button = statusItem.button {
@@ -115,7 +117,9 @@ final class StatusBarController: NSObject {
 
   // MARK: Panel
 
-  private func showPanel() {
+  // Also opened by clicking a limit notification.
+  func showPanel() {
+    if panel?.isVisible == true { return }
     let panel = self.panel ?? makePanel()
     position(panel)
     panel.makeKeyAndOrderFront(nil)
@@ -176,7 +180,7 @@ final class StatusBarController: NSObject {
   @objc private func openSettings() {
     closePanel()
     if settingsWindow == nil {
-      let view = SettingsView(prefs: prefs, store: store, scheduler: scheduler, login: login)
+      let view = SettingsView(prefs: prefs, store: store, scheduler: scheduler, notifier: notifier, login: login)
       let hosting = NSHostingController(rootView: view)
       hosting.sizingOptions = [.preferredContentSize]
       let window = NSWindow(contentViewController: hosting)

@@ -144,6 +144,7 @@ enum Presentation {
     "claude": "claude auth login",
     "codex": "codex login",
     "cursor": "cursor-agent login",
+    "opencode": "opencode auth login",
   ]
 
   static func planLabel(_ record: UsageRecord) -> String {
@@ -171,6 +172,60 @@ enum Presentation {
     records.contains { record in
       (bindingWindow(record, now: now)?.percent ?? 0) >= 0.9 || balanceAlarming(record.balance)
     }
+  }
+
+  // MARK: Notifications
+
+  struct LimitAlert: Equatable {
+    var key: String
+    var title: String
+    var body: String
+  }
+
+  // What to notify about: each window at the alarm point (90%, as the robot
+  // and the bar), and a balance down to its last 10%, once per window per
+  // reset. A key names the window and its reset to the minute (Claude's
+  // reset times move in their microseconds between checks). One that stays
+  // between 85% and 90% stays sent, so a figure hovering at the line doesn't
+  // repeat; anything lower, reset, or gone drops out and can alert again.
+  static func notificationsDue(_ records: [UsageRecord], now: Date, sent: Set<String>) -> (alerts: [LimitAlert], sent: Set<String>) {
+    var alerts: [LimitAlert] = []
+    var kept: Set<String> = []
+
+    func consider(_ key: String, level: Double, rearm: Double, threshold: Double, alert: () -> LimitAlert) {
+      if level >= threshold {
+        if !sent.contains(key) { alerts.append(alert()) }
+        kept.insert(key)
+      } else if level >= rearm, sent.contains(key) {
+        kept.insert(key)
+      }
+    }
+
+    for record in records {
+      for window in limitWindows(record.limits, now: now) {
+        let minute = window.resetAt.map { String(Int($0.timeIntervalSince1970 / 60)) } ?? ""
+        let key = "\(record.id)|\(window.title)|\(minute)"
+        consider(key, level: window.percent, rearm: 0.85, threshold: 0.9) {
+          let name = scopedPart(window.title)?.model
+            ?? (["Session", "Weekly", "Monthly", "Limit", "Spend limit"].contains(window.title) ? window.title.lowercased() : window.title)
+          var body = ""
+          if let reset = window.resetAt, reset > now { body = "Resets in \(formatDuration(reset.timeIntervalSince(now)))" }
+          return LimitAlert(key: key, title: "\(record.name) \(name) at \(Int((window.percent * 100).rounded()))%", body: body)
+        }
+      }
+      if let balance = record.balance, balance.funded > 0 {
+        // Measured as what's spent, so the same "higher is worse" rule applies.
+        let key = "\(record.id)|balance"
+        consider(key, level: 1 - balance.remaining / balance.funded, rearm: 0.85, threshold: 0.9) {
+          LimitAlert(
+            key: key,
+            title: "\(record.name) balance low",
+            body: "\(formatMoney(balance.remaining, currency: balance.currency)) left of \(formatMoney(balance.funded, currency: balance.currency))"
+          )
+        }
+      }
+    }
+    return (alerts, kept)
   }
 
   static func balanceAlarming(_ balance: Balance?) -> Bool {

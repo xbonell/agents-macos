@@ -10,7 +10,7 @@ import Observation
 @Observable
 final class Scheduler {
   // The collectors this release ships.
-  static let providers = ["claude", "codex", "cursor"]
+  static let providers = ["claude", "codex", "cursor", "opencode"]
 
   private(set) var running = false
   // Checked before every update, so installing the tools later recovers.

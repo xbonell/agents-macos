@@ -4,7 +4,7 @@ Guidance for AI coding agents working in this repository.
 
 ## What this is
 
-A native macOS menu bar app (an AppKit `NSStatusItem` with SwiftUI views, macOS 14+) that ports Omarchy's `omarchy.agents` panel: rate limits, reset times, and token stats for AI coding subscriptions. The upstream plugin lives at `~/Work/99.misc/omarchy/shell/plugins/agents` (QML panel), with its collectors at `~/Work/99.misc/omarchy/bin/omarchy-agent-usage-*`. The record format is `omarchy/docs/agent-usage-collectors.md`. The first release covers Claude Code, Codex, and Cursor.
+A native macOS menu bar app (an AppKit `NSStatusItem` with SwiftUI views, macOS 14+) that ports Omarchy's `omarchy.agents` panel: rate limits, reset times, and token stats for AI coding subscriptions. The upstream plugin lives at `~/Work/99.misc/omarchy/shell/plugins/agents` (QML panel), with its collectors at `~/Work/99.misc/omarchy/bin/omarchy-agent-usage-*`. The record format is `omarchy/docs/agent-usage-collectors.md`. It covers Claude Code, Codex, Cursor, and OpenCode (Zen/Go; hidden until used).
 
 ## Commands
 
@@ -25,12 +25,17 @@ scripts/make-icon.sh              # regenerate Icon/AppIcon.icns (robot on a til
 .build/debug/Agents --snapshot /path/out.png [--dark]
 AGENTS_USAGE_DIR=/dir/with/sample/records .build/debug/Agents --snapshot /path/out.png
 
+# Print the limit notifications the records would trigger (remembered in the
+# com.xbonell.agents.dryrun defaults domain; `defaults delete` it to start over)
+AGENTS_USAGE_DIR=/dir/with/sample/records .build/debug/Agents --notify-dry-run
+
 # App logs
 log show --predicate 'subsystem == "Agents"' --last 10m --style compact
 
 # Settings (also in the Settings window; read at launch, so relaunch after defaults write)
 defaults write com.xbonell.agents refreshIntervalSec -int 300      # 30…3600, default 900
 defaults write com.xbonell.agents disabledProviders -array cursor  # providers switched off
+defaults write com.xbonell.agents notifyNearLimit -bool false      # limit notifications
 ```
 
 There is no test target. Verify collector changes by running `run_collector.py`, and UI changes with `--snapshot`. When swapping a running instance, kill it by pid, then `open dist/Agents.app`.
@@ -68,6 +73,7 @@ There are two halves, split the same way as upstream: Python collectors write on
   - limit windows, with expired ones reset to 0;
   - model-scoped windows ("X Weekly"/"X Monthly") attached to their parent window;
   - statuses and usage notes, the alarm rule (≥ 90%, or balance ≤ 10%), the footer's "Updated …" line;
+  - `notificationsDue`, the notification rule: each window at 90% (and a balance at its last 10%) once per window per reset, keyed on the reset time rounded to the minute (Claude's moves in microseconds), staying sent above 85% so a figure hovering at the line doesn't repeat;
   - the sign-in command allow-list (`signInCommands`), the only commands `SignIn.swift` ever runs, via a `.command` file in `~/Library/Caches/Agents` opened in the default terminal;
   - the rotating summary phrases, `friendlyModelName`, and token formatting.
   Port further `Panel.qml` behavior here, not in views.
@@ -75,7 +81,8 @@ There are two halves, split the same way as upstream: Python collectors write on
   - Left click toggles `PanelWindow`, a borderless non-activating `NSPanel` (popover material, 10 pt corners) hosting `PanelView` through an `NSHostingController` with `.preferredContentSize`, positioned under the robot. A click outside (global monitor) or Esc closes it, and opening it runs a limits refresh.
   - Right click shows an `NSMenu` (Refresh, Settings…, Open at Login, Quit). The red alarm robot is a non-template image, re-evaluated through `withObservationTracking` on `store.visible` and once a minute.
   - It also owns the Settings window (`UI/SettingsView.swift`, a grouped `Form` in a plain `NSWindow`, not a SwiftUI `Settings` scene).
-- `Preferences.swift` is the `@Observable` settings model over `UserDefaults` (`refreshIntervalSec`, `disabledProviders`). An interval change restarts the scheduler's wait without an extra run. `AgentsApp.swift` is an AppKit `@main` that builds preferences, store, scheduler and controller; `--snapshot` exits before any UI is created.
+- `LimitNotifier.swift` posts `notificationsDue`'s alerts with `UNUserNotificationCenter`, re-evaluating through `withObservationTracking` on `store.visible`. What's been sent is kept in `UserDefaults` (`notifiedLimits`, seeded on first launch so nothing old fires) and tracked even while notifications are off. Clicking one opens the panel. It's inert unless bundled: `UNUserNotificationCenter` crashes under `swift run`.
+- `Preferences.swift` is the `@Observable` settings model over `UserDefaults` (`refreshIntervalSec`, `disabledProviders`, `notifyNearLimit`). An interval change restarts the scheduler's wait without an extra run. `AgentsApp.swift` is an AppKit `@main` that builds preferences, store, scheduler and controller; `--snapshot` exits before any UI is created.
 - `Theme.swift` and `UI/` are the view layer. It follows **Control Center style** rather than Omarchy's look: a card per provider, 13/11 pt system text, and accent-colored meters that turn red at ≥ 90%. Model-scoped allowances show as labelled sub-rows under their window, not as Omarchy's unlabelled ticks.
 - `Paths.swift` holds every location. `AGENTS_USAGE_DIR` overrides the records dir for development.
 
@@ -85,6 +92,7 @@ There are two halves, split the same way as upstream: Python collectors write on
 - The package uses **Swift 5 language mode** (`swift-tools-version:5.9`): regex literals need the `#/…/#` form.
 - **Don't go back to `MenuBarExtra`**: besides lacking right clicks, a `TimelineView` in its label re-lays out the status button in a loop and starves the main actor, so the scheduler never runs.
 - **Panel sizing**: the panel window follows the hosting controller's `preferredContentSize`, which is the content's ideal height. Don't wrap the content in `ViewThatFits` or a fixed-height `ScrollView`, or the window grows to that frame. `PanelView` measures the content and switches to a `ScrollView` only past `Theme.maxPanelHeight`.
+- **A notification that doesn't show** is usually a Focus mode holding banners, not a bug: the `notify` log category records each post (`Notified: …`) and, at launch, the settings macOS reports for Agents (authorization, alert style, banners, Notification Center).
 - `PanelView` stays alive between openings, so `.onAppear` fires once: put per-opening work in `StatusBarController.showPanel()`.
 - **`--snapshot` uses `ImageRenderer`**: it can't draw AppKit-backed controls (`ScrollView`, `ProgressView`, `.borderless` buttons, checkboxes), which come out blank or as a yellow 🚫 placeholder. That's why meters are drawn shapes, not `ProgressView`. Tooltips (`.help`) and the real material background aren't visible in snapshots either.
 - **Icons**: in the panel each mark sits on a white app-icon tile (`ProviderMark`), always using the dark-ink `-light.svg` variant. `Icons.substitutes` swaps a mark that doesn't hold up at 24 pt for another asset: Codex shows `assets/openai.svg` (OpenAI's mark from LobeHub's MIT icon set, added by this port, so `sync-upstream.sh` leaves it alone). `NSImage` reads the SVG marks natively. `Icons.image(named:)` scales marks with tiny declared sizes (Codex's `1em`) up to a 64 pt working size. The menu bar robot (`assets/robot.svg`, the Omarchy bar glyph U+F16A3, regenerated with `scripts/extract-glyph.swift`, which needs a Nerd Font) is then pinned to 16 pt high as a template image.

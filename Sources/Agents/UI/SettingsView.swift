@@ -6,10 +6,11 @@ struct SettingsView: View {
   @Bindable var prefs: Preferences
   let store: UsageStore
   let scheduler: Scheduler
+  let notifier: LimitNotifier
   @ObservedObject var login: LoginItem
 
   private static let intervals = [300, 600, 900, 1800, 3600]
-  private static let names = ["claude": "Claude Code", "codex": "Codex", "cursor": "Cursor"]
+  private static let names = ["claude": "Claude Code", "codex": "Codex", "cursor": "Cursor", "opencode": "OpenCode"]
 
   var body: some View {
     Form {
@@ -21,6 +22,14 @@ struct SettingsView: View {
           // A value set with `defaults write` stays selectable.
           if !Self.intervals.contains(prefs.refreshIntervalSec) {
             Text(Self.intervalLabel(prefs.refreshIntervalSec)).tag(prefs.refreshIntervalSec)
+          }
+        }
+        if LimitNotifier.available {
+          Toggle("Notify when a limit reaches 90%", isOn: $prefs.notifyNearLimit)
+          if prefs.notifyNearLimit && notifier.denied {
+            Text("Notifications are off for Agents in System Settings › Notifications.")
+              .font(.caption)
+              .foregroundStyle(.secondary)
           }
         }
         if login.available {
@@ -53,7 +62,10 @@ struct SettingsView: View {
     .formStyle(.grouped)
     .frame(width: 400)
     .fixedSize(horizontal: false, vertical: true)
-    .onAppear { login.refresh() }
+    .onAppear {
+      login.refresh()
+      notifier.refreshPermission()
+    }
   }
 
   // Switching a provider back on collects it right away.

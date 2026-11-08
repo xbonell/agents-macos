@@ -64,7 +64,7 @@ struct PanelView: View {
         Card {
           Text(scheduler?.running == true
             ? "Collecting usage…"
-            : "No agents yet. Sign in to Claude Code, Codex, or Cursor and they'll show up here.")
+            : "No agents yet. Sign in to Claude Code, Codex, Cursor, or OpenCode and they'll show up here.")
             .font(Theme.secondary)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)

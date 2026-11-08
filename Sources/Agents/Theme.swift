@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 // The panel follows Control Center's modules: standard system text sizes,
@@ -6,7 +7,11 @@ import SwiftUI
 enum Theme {
   static let panelWidth: CGFloat = 320
   static let panelPadding: CGFloat = 12
-  static let maxPanelHeight: CGFloat = 640
+  // The panel scrolls only when it wouldn't fit under the menu bar: the
+  // screen's usable height, less a margin.
+  @MainActor static var maxPanelHeight: CGFloat {
+    max(400, (NSScreen.main?.visibleFrame.height ?? 800) - 48)
+  }
 
   static let cardSpacing: CGFloat = 8
   static let cardPadding: CGFloat = 12
