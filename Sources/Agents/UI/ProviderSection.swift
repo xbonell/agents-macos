@@ -16,14 +16,12 @@ struct ProviderSection: View {
         HStack {
           Label("Sign-in required", systemImage: "exclamationmark.triangle.fill")
             .font(Theme.secondary)
-            .foregroundStyle(Theme.urgent)
-            .help(record.authHelpText.isEmpty ? record.usageStatusText : record.authHelpText)
+          .help(record.authHelpText.isEmpty ? record.usageStatusText : record.authHelpText)
           Spacer(minLength: 8)
           if let command = Presentation.signInCommands[record.id] {
             Button("Sign In…") { SignIn.run(record.id) }
               .buttonStyle(.plain)
               .font(Theme.secondary.weight(.medium))
-              .foregroundStyle(Color.accentColor)
               .help("Opens a terminal and runs \(command)")
           }
         }

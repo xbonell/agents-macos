@@ -74,11 +74,15 @@ struct UsageRecord: Decodable, Identifiable, Equatable {
   }
 
   // Main.qml's providerHasData: an agent earns a section by having produced
-  // numbers, not merely by having a record.
+  // numbers, not merely by having a record. Unlike Omarchy, whose add-account
+  // view covers it, a record with a status also gets one: a collector leaves
+  // the status empty for an agent this machine doesn't use, so "Waiting for
+  // auth" means one that's installed but signed out, and its card is where
+  // to sign back in.
   var hasData: Bool {
     totalPrompts > 0 || totalSessions > 0 || activeDays > 0 || todayPrompts > 0
       || todaySessions > 0 || !limits.isEmpty || !accounts.isEmpty || balance != nil
-      || (ready && !tierLabel.isEmpty)
+      || (ready && !tierLabel.isEmpty) || !usageStatusText.isEmpty
   }
 }
 
