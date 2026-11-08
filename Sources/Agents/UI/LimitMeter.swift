@@ -25,9 +25,11 @@ struct Meter: View {
 }
 
 // One limit window: its name and, on the right, the time until it resets and
-// how much is used, with the meter underneath. Model-scoped allowances on the
-// same clock (Cursor's auto and named models, Claude's Fable) follow as
-// labelled sub-rows; the age of kept numbers is in the tooltip.
+// how much is used, with the meter underneath. Only the meter turns red near
+// the limit; the text stays secondary, as in the system's own panels.
+// Model-scoped allowances on the same clock (Cursor's auto and named models,
+// Claude's Fable) follow as labelled sub-rows; the age of kept numbers is in
+// the tooltip.
 struct LimitRow: View {
   let window: LimitWindow
   let stale: Bool
@@ -43,7 +45,7 @@ struct LimitRow: View {
           Text(detail)
             .font(Theme.secondary)
             .monospacedDigit()
-            .foregroundStyle(style(for: window.percent))
+            .foregroundStyle(.secondary)
         }
         Meter(value: window.percent, alarming: window.percent >= 0.9)
       }
@@ -59,7 +61,7 @@ struct LimitRow: View {
           Text(percent(scoped.percent))
             .font(Theme.secondary)
             .monospacedDigit()
-            .foregroundStyle(style(for: scoped.percent))
+            .foregroundStyle(.secondary)
             .frame(width: 32, alignment: .trailing)
         }
         .padding(.leading, 10)
@@ -77,9 +79,5 @@ struct LimitRow: View {
 
   private func percent(_ value: Double) -> String {
     "\(Int((value * 100).rounded()))%"
-  }
-
-  private func style(for value: Double) -> AnyShapeStyle {
-    value >= 0.9 ? AnyShapeStyle(Theme.urgent) : AnyShapeStyle(.secondary)
   }
 }

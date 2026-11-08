@@ -73,7 +73,7 @@ struct BalanceRow: View {
         Text(Presentation.formatMoney(balance.remaining, currency: balance.currency))
           .font(Theme.secondary)
           .monospacedDigit()
-          .foregroundStyle(alarming ? AnyShapeStyle(Theme.urgent) : AnyShapeStyle(.secondary))
+          .foregroundStyle(.secondary)
       }
       Meter(value: balance.funded > 0 ? balance.remaining / balance.funded : 0, alarming: alarming)
       let detail = Presentation.balanceDetail(balance)
