@@ -17,22 +17,25 @@ final class Scheduler {
   private(set) var pythonMissing = false
 
   @ObservationIgnored private let store: UsageStore
+  @ObservationIgnored private let prefs: Preferences
   @ObservationIgnored private var pending: UpdateKind?
   @ObservationIgnored private var timerTask: Task<Void, Never>?
   @ObservationIgnored private var retryTask: Task<Void, Never>?
   @ObservationIgnored private var retryIds: [String] = []
 
-  // Omarchy's refreshIntervalSec setting: 900 by default, never under 30.
-  var refreshInterval: TimeInterval {
-    let configured = UserDefaults.standard.integer(forKey: "refreshIntervalSec")
-    return TimeInterval(max(30, configured == 0 ? 900 : configured))
-  }
+  private var refreshInterval: TimeInterval { TimeInterval(prefs.refreshIntervalSec) }
 
-  init(store: UsageStore) {
+  // Omarchy's --except: a provider switched off in settings isn't collected.
+  private var enabledProviders: [String] { Self.providers.filter(prefs.isEnabled) }
+
+  init(store: UsageStore, prefs: Preferences) {
     self.store = store
+    self.prefs = prefs
     store.onChange = { [weak self] in self?.scheduleLimitsRetry() }
+    // A new interval starts a new wait, without an extra run of its own.
+    prefs.onIntervalChange = { [weak self] in self?.startTimer(runNow: false) }
     scheduleLimitsRetry()
-    startTimer()
+    startTimer(runNow: true)
   }
 
   func refresh() { run(.force) }
@@ -47,7 +50,7 @@ final class Scheduler {
     Task {
       pythonMissing = !(await CollectorRunner.pythonAvailable())
       if !pythonMissing {
-        await CollectorRunner.update(ids ?? Self.providers, kind: kind)
+        await CollectorRunner.update((ids ?? Self.providers).filter(prefs.isEnabled), kind: kind)
       }
       running = false
       store.reload()
@@ -70,12 +73,15 @@ final class Scheduler {
     }
   }
 
-  private func startTimer() {
+  private func startTimer(runNow: Bool) {
+    timerTask?.cancel()
     timerTask = Task { [weak self] in
+      var first = true
       while !Task.isCancelled {
         guard let self else { return }
         let near = self.nearLimit
-        self.run(near ? .limits : .normal)
+        if !first || runNow { self.run(near ? .limits : .normal) }
+        first = false
         let interval = near ? min(180, self.refreshInterval) : self.refreshInterval
         try? await Task.sleep(for: .seconds(interval))
       }
@@ -85,7 +91,7 @@ final class Scheduler {
   // Only the advising agents rerun, so an outage at one provider doesn't put
   // every collector on a 30-second treadmill.
   private func scheduleLimitsRetry() {
-    let advising = store.records.filter(\.retryAdvised).map(\.id).filter(Self.providers.contains)
+    let advising = store.records.filter(\.retryAdvised).map(\.id).filter(enabledProviders.contains)
     retryIds = advising
     retryTask?.cancel()
     guard !advising.isEmpty else { return }

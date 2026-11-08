@@ -1,37 +1,33 @@
 import AppKit
-import SwiftUI
 
+// An AppKit entry point: the menu bar item is an NSStatusItem (see
+// StatusBarController), and there's no SwiftUI scene to host.
 @main
-struct AgentsApp: App {
-  @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
-  // Plain lets, not @State: the App is made once, and the Command Line Tools
-  // ship no SwiftUI macro plugin, so @State doesn't build without Xcode.
-  private let store: UsageStore
-  private let scheduler: Scheduler
+enum AgentsApp {
+  @MainActor
+  static func main() {
+    let app = NSApplication.shared
+    let delegate = AppDelegate()
+    app.delegate = delegate
+    // A menu bar extra, not an app: no Dock icon even when run unbundled
+    // with `swift run` (the built .app sets LSUIElement as well).
+    app.setActivationPolicy(.accessory)
+    withExtendedLifetime(delegate) { app.run() }
+  }
+}
 
-  init() {
-    store = UsageStore()
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+  private var controller: StatusBarController?
+
+  func applicationDidFinishLaunching(_ notification: Notification) {
+    let prefs = Preferences()
+    let store = UsageStore(prefs: prefs)
     if let snapshot = Snapshot.request() {
       Snapshot.render(store: store, to: snapshot.path, scheme: snapshot.scheme)
       exit(0)
     }
-    scheduler = Scheduler(store: store)
-  }
-
-  var body: some Scene {
-    MenuBarExtra {
-      PanelView(store: store, scheduler: scheduler)
-    } label: {
-      StatusItemIcon(store: store)
-    }
-    .menuBarExtraStyle(.window)
-  }
-}
-
-final class AppDelegate: NSObject, NSApplicationDelegate {
-  // A menu bar extra, not an app: no Dock icon even when run unbundled with
-  // `swift run` (the built .app sets LSUIElement as well).
-  func applicationDidFinishLaunching(_ notification: Notification) {
-    NSApp.setActivationPolicy(.accessory)
+    let scheduler = Scheduler(store: store, prefs: prefs)
+    controller = StatusBarController(store: store, scheduler: scheduler, prefs: prefs)
   }
 }

@@ -14,15 +14,17 @@ final class UsageStore {
   private(set) var records: [UsageRecord] = []
   private(set) var revision = 0
 
-  // The agents worth a section: Main.qml's enabledProviders, less the
-  // settings toggle this port doesn't have yet.
-  var visible: [UsageRecord] { records.filter(\.hasData) }
+  // The agents worth a section: Main.qml's enabledProviders, switched on in
+  // settings and with numbers to show.
+  var visible: [UsageRecord] { records.filter { $0.hasData && prefs.isEnabled($0.id) } }
 
+  @ObservationIgnored private let prefs: Preferences
   @ObservationIgnored private var texts: [String: Data] = [:]
   @ObservationIgnored private var watcher: DispatchSourceFileSystemObject?
   @ObservationIgnored var onChange: (() -> Void)?
 
-  init() {
+  init(prefs: Preferences) {
+    self.prefs = prefs
     try? FileManager.default.createDirectory(at: Paths.usageDir, withIntermediateDirectories: true)
     reload()
     watch()

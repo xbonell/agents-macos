@@ -4,7 +4,7 @@ Guidance for AI coding agents working in this repository.
 
 ## What this is
 
-A native macOS menu bar app (SwiftUI `MenuBarExtra`, macOS 14+) that ports Omarchy's `omarchy.agents` panel: rate limits, reset times, and token stats for AI coding subscriptions. The upstream plugin lives at `~/Work/99.misc/omarchy/shell/plugins/agents` (QML panel), with its collectors at `~/Work/99.misc/omarchy/bin/omarchy-agent-usage-*`. The record format is `omarchy/docs/agent-usage-collectors.md`. The first release covers Claude Code, Codex, and Cursor.
+A native macOS menu bar app (an AppKit `NSStatusItem` with SwiftUI views, macOS 14+) that ports Omarchy's `omarchy.agents` panel: rate limits, reset times, and token stats for AI coding subscriptions. The upstream plugin lives at `~/Work/99.misc/omarchy/shell/plugins/agents` (QML panel), with its collectors at `~/Work/99.misc/omarchy/bin/omarchy-agent-usage-*`. The record format is `omarchy/docs/agent-usage-collectors.md`. The first release covers Claude Code, Codex, and Cursor.
 
 ## Commands
 
@@ -27,6 +27,10 @@ AGENTS_USAGE_DIR=/dir/with/sample/records .build/debug/Agents --snapshot /path/o
 
 # App logs
 log show --predicate 'subsystem == "Agents"' --last 10m --style compact
+
+# Settings (also in the Settings window; read at launch, so relaunch after defaults write)
+defaults write com.xbonell.agents refreshIntervalSec -int 300      # 30…3600, default 900
+defaults write com.xbonell.agents disabledProviders -array cursor  # providers switched off
 ```
 
 There is no test target. Verify collector changes by running `run_collector.py`, and UI changes with `--snapshot`. When swapping a running instance, kill it by pid, then `open dist/Agents.app`.
@@ -58,14 +62,20 @@ There are two halves, split the same way as upstream: Python collectors write on
   - `--limits-only` when the panel opens, `--force` from the refresh button.
   - A 30 s limits retry, only for records with `retryAdvised`.
   - One update runs at a time; queued requests collapse into one, with `force` taking precedence.
-  - `Scheduler.providers` is the list of collectors run, and also the panel's sort order.
-- `Model/UsageStore.swift` watches the usage dir (`DispatchSource`) and decodes records with `Model/Record.swift`, which is deliberately lenient: every field is optional or defaulted. `visible` applies upstream's `providerHasData`.
+  - `Scheduler.providers` is the list of collectors, and also the panel's sort order; providers switched off in `Preferences` aren't run.
+- `Model/UsageStore.swift` watches the usage dir (`DispatchSource`) and decodes records with `Model/Record.swift`, which is deliberately lenient: every field is optional or defaulted. `visible` applies upstream's `providerHasData` and hides providers switched off in `Preferences`.
 - `Model/Presentation.swift` is the SwiftUI-free port of `Panel.qml`'s logic:
   - limit windows, with expired ones reset to 0;
   - model-scoped windows ("X Weekly"/"X Monthly") attached to their parent window;
-  - statuses and usage notes, the alarm rule (≥ 90%, or balance ≤ 10%);
+  - statuses and usage notes, the alarm rule (≥ 90%, or balance ≤ 10%), the footer's "Updated …" line;
+  - the sign-in command allow-list (`signInCommands`), the only commands `SignIn.swift` ever runs, via a `.command` file in `~/Library/Caches/Agents` opened in the default terminal;
   - the rotating summary phrases, `friendlyModelName`, and token formatting.
   Port further `Panel.qml` behavior here, not in views.
+- `StatusBarController.swift` owns the menu bar item. It's AppKit because SwiftUI's `MenuBarExtra` can't tell right clicks from left:
+  - Left click toggles `PanelWindow`, a borderless non-activating `NSPanel` (popover material, 10 pt corners) hosting `PanelView` through an `NSHostingController` with `.preferredContentSize`, positioned under the robot. A click outside (global monitor) or Esc closes it, and opening it runs a limits refresh.
+  - Right click shows an `NSMenu` (Refresh, Settings…, Open at Login, Quit). The red alarm robot is a non-template image, re-evaluated through `withObservationTracking` on `store.visible` and once a minute.
+  - It also owns the Settings window (`UI/SettingsView.swift`, a grouped `Form` in a plain `NSWindow`, not a SwiftUI `Settings` scene).
+- `Preferences.swift` is the `@Observable` settings model over `UserDefaults` (`refreshIntervalSec`, `disabledProviders`). An interval change restarts the scheduler's wait without an extra run. `AgentsApp.swift` is an AppKit `@main` that builds preferences, store, scheduler and controller; `--snapshot` exits before any UI is created.
 - `Theme.swift` and `UI/` are the view layer. It follows **Control Center style** rather than Omarchy's look: a card per provider, 13/11 pt system text, and accent-colored meters that turn red at ≥ 90%. Model-scoped allowances show as labelled sub-rows under their window, not as Omarchy's unlabelled ticks.
 - `Paths.swift` holds every location. `AGENTS_USAGE_DIR` overrides the records dir for development.
 
@@ -73,12 +83,13 @@ There are two halves, split the same way as upstream: Python collectors write on
 
 - **No `@State`**: on the Command Line Tools SDK, SwiftUI's macro plugin is missing and `@State` doesn't build. Use `@StateObject` with a small `ObservableObject` (see `HoverState`, `PhraseRotator`). `@Observable` does work, because `ObservationMacros` ships with the toolchain.
 - The package uses **Swift 5 language mode** (`swift-tools-version:5.9`): regex literals need the `#/…/#` form.
-- **Never put a `TimelineView` (or anything that re-renders on its own) in the `MenuBarExtra` label**: it re-lays out the status button in a loop and starves the main actor, so the scheduler never runs. `StatusItemIcon` recomputes only when the records change.
-- **Panel sizing**: the window takes the content's ideal height. Don't wrap the content in `ViewThatFits` or a fixed-height `ScrollView`, or the window grows to that frame. `PanelView` measures the content and switches to a `ScrollView` only past `Theme.maxPanelHeight`.
+- **Don't go back to `MenuBarExtra`**: besides lacking right clicks, a `TimelineView` in its label re-lays out the status button in a loop and starves the main actor, so the scheduler never runs.
+- **Panel sizing**: the panel window follows the hosting controller's `preferredContentSize`, which is the content's ideal height. Don't wrap the content in `ViewThatFits` or a fixed-height `ScrollView`, or the window grows to that frame. `PanelView` measures the content and switches to a `ScrollView` only past `Theme.maxPanelHeight`.
+- `PanelView` stays alive between openings, so `.onAppear` fires once: put per-opening work in `StatusBarController.showPanel()`.
 - **`--snapshot` uses `ImageRenderer`**: it can't draw AppKit-backed controls (`ScrollView`, `ProgressView`, `.borderless` buttons, checkboxes), which come out blank or as a yellow 🚫 placeholder. That's why meters are drawn shapes, not `ProgressView`. Tooltips (`.help`) and the real material background aren't visible in snapshots either.
 - **Icons**: in the panel each mark sits on a white app-icon tile (`ProviderMark`), always using the dark-ink `-light.svg` variant. `Icons.substitutes` swaps a mark that doesn't hold up at 24 pt for another asset: Codex shows `assets/openai.svg` (OpenAI's mark from LobeHub's MIT icon set, added by this port, so `sync-upstream.sh` leaves it alone). `NSImage` reads the SVG marks natively. `Icons.image(named:)` scales marks with tiny declared sizes (Codex's `1em`) up to a 64 pt working size. The menu bar robot (`assets/robot.svg`, the Omarchy bar glyph U+F16A3, regenerated with `scripts/extract-glyph.swift`, which needs a Nerd Font) is then pinned to 16 pt high as a template image.
 - `SwiftPM` resources live in `Sources/Agents/Resources` (copied as `Bundle.module`). `build-app.sh` places `Agents_Agents.bundle` in `Contents/Resources`, where the generated accessor looks first.
 
 ## Adding a provider
 
-Add its id to `PROVIDERS` in `scripts/sync-upstream.sh` and re-sync, then add it to `Scheduler.providers`. Run the collector by itself, and add any macOS path or Keychain differences to `macos_shim.py`. An `assets/<id>.svg` mark is optional; the robot stands in for a missing one.
+Add its id to `PROVIDERS` in `scripts/sync-upstream.sh` and re-sync, then add it to `Scheduler.providers`. Run the collector by itself, and add any macOS path or Keychain differences to `macos_shim.py`. An `assets/<id>.svg` mark is optional; the robot stands in for a missing one. Add its display name to `SettingsView.names`, and its login command to `Presentation.signInCommands` if it has one.
