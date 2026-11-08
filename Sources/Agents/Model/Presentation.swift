@@ -130,6 +130,22 @@ enum Presentation {
 
   // MARK: Status
 
+  // How old the numbers are, from the newest record: the panel's footer.
+  static func updatedText(_ records: [UsageRecord], now: Date, running: Bool) -> String {
+    if running { return "Updating…" }
+    guard let newest = records.compactMap({ ISODate.parse($0.updatedAt) }).max() else { return "" }
+    let age = now.timeIntervalSince(newest)
+    return age < 60 ? "Updated just now" : "Updated \(formatDuration(age)) ago"
+  }
+
+  // The commands that sign each agent's CLI in again, as its collector's
+  // help text names them. Only these ever run; a record's own text never does.
+  static let signInCommands: [String: String] = [
+    "claude": "claude auth login",
+    "codex": "codex login",
+    "cursor": "cursor-agent login",
+  ]
+
   static func planLabel(_ record: UsageRecord) -> String {
     let tier = record.tierLabel
     return tier.isEmpty ? "" : tier.prefix(1).uppercased() + tier.dropFirst()

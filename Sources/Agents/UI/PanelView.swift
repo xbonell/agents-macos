@@ -6,6 +6,7 @@ struct PanelView: View {
   let store: UsageStore
   // nil when rendering a snapshot, which must not run the collectors.
   let scheduler: Scheduler?
+  var openSettings: () -> Void = {}
 
   @StateObject private var measured = MeasuredHeight()
 
@@ -29,9 +30,6 @@ struct PanelView: View {
       .onPreferenceChange(ContentHeightKey.self) { measured.height = $0 }
     }
     .frame(width: Theme.panelWidth)
-    // Opening the panel wants the numbers that go stale on the wire, not
-    // another walk over every transcript on disk.
-    .onAppear { scheduler?.refreshLimits() }
   }
 
   private var providers: [UsageRecord] {
@@ -78,7 +76,10 @@ struct PanelView: View {
       }
 
       Divider().padding(.vertical, 4)
-      Footer()
+      Footer(
+        updated: Presentation.updatedText(store.visible, now: now, running: scheduler?.running ?? false),
+        openSettings: openSettings
+      )
     }
     .padding(Theme.panelPadding)
   }
@@ -93,23 +94,30 @@ private struct ContentHeightKey: PreferenceKey {
   static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
 
+// How old the numbers are, and a gear menu with Settings and Quit for anyone
+// who never right-clicks the robot.
 private struct Footer: View {
-  @StateObject private var login = LoginItem()
+  let updated: String
+  let openSettings: () -> Void
 
   var body: some View {
     HStack {
-      if login.available {
-        Toggle("Open at Login", isOn: Binding(get: { login.enabled }, set: { login.set($0) }))
-          .toggleStyle(.checkbox)
-          .font(Theme.body)
-          .help(login.needsApproval ? "Allow Agents in System Settings › General › Login Items." : "")
-      }
+      Text(updated)
+        .font(Theme.secondary)
+        .foregroundStyle(.secondary)
       Spacer()
-      Button("Quit") { NSApplication.shared.terminate(nil) }
-        .buttonStyle(.borderless)
-        .font(Theme.body)
+      Menu {
+        Button("Settings…", action: openSettings)
+        Divider()
+        Button("Quit Agents") { NSApplication.shared.terminate(nil) }
+      } label: {
+        Image(systemName: "gearshape")
+      }
+      .menuStyle(.borderlessButton)
+      .menuIndicator(.hidden)
+      .fixedSize()
+      .help("Settings and Quit")
     }
     .padding(.horizontal, 4)
-    .onAppear { login.refresh() }
   }
 }

@@ -13,10 +13,20 @@ struct ProviderSection: View {
       head
 
       if Presentation.needsSignIn(record) {
-        Label("Sign-in required", systemImage: "exclamationmark.triangle.fill")
-          .font(Theme.secondary)
-          .foregroundStyle(Theme.urgent)
-          .help(record.authHelpText.isEmpty ? record.usageStatusText : record.authHelpText)
+        HStack {
+          Label("Sign-in required", systemImage: "exclamationmark.triangle.fill")
+            .font(Theme.secondary)
+            .foregroundStyle(Theme.urgent)
+            .help(record.authHelpText.isEmpty ? record.usageStatusText : record.authHelpText)
+          Spacer(minLength: 8)
+          if let command = Presentation.signInCommands[record.id] {
+            Button("Sign In…") { SignIn.run(record.id) }
+              .buttonStyle(.plain)
+              .font(Theme.secondary.weight(.medium))
+              .foregroundStyle(Color.accentColor)
+              .help("Opens a terminal and runs \(command)")
+          }
+        }
       }
 
       ForEach(Array(windows.enumerated()), id: \.offset) { _, window in
@@ -63,7 +73,7 @@ struct BalanceRow: View {
         Text(Presentation.formatMoney(balance.remaining, currency: balance.currency))
           .font(Theme.secondary)
           .monospacedDigit()
-          .foregroundStyle(alarming ? AnyShapeStyle(Theme.urgent) : AnyShapeStyle(.secondary))
+          .foregroundStyle(.secondary)
       }
       Meter(value: balance.funded > 0 ? balance.remaining / balance.funded : 0, alarming: alarming)
       let detail = Presentation.balanceDetail(balance)

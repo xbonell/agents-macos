@@ -21,7 +21,7 @@ that split:
   applies `macos_shim.py`, which reads Claude Code's and cursor-agent's
   tokens from the Keychain (read only) and Cursor's editor database from
   `~/Library/Application Support`.
-- **The app** (SwiftUI `MenuBarExtra`) runs the collectors with
+- **The app** (an AppKit menu bar item with a SwiftUI panel) runs the collectors with
   `/usr/bin/python3`, writes each record atomically to
   `~/Library/Application Support/Agents/omarchy/agents/usage/`, watches that
   folder, and draws the panel. Refresh timings are Omarchy's: every 15
@@ -50,8 +50,19 @@ scripts/build-app.sh            # build dist/Agents.app (ad-hoc signed)
 scripts/build-app.sh --install  # and copy it to ~/Applications
 ```
 
-"Open at login" in the panel's footer registers the app as a login item; it's
-offered only when running as `Agents.app`.
+## Using it
+
+- **Click** the robot for the panel: a card per provider with its limits, and
+  in the footer how long ago the numbers were updated.
+- **Right-click** it (or Control-click) for Refresh, Settings…, Open at Login,
+  and Quit. The gear in the panel's footer has Settings… and Quit too.
+- **Settings** sets how often to refresh (5 minutes to 1 hour; default 15) and
+  which providers to collect and show. Open at Login is offered only when
+  running as `Agents.app`.
+- **Sign In…** appears next to "Sign-in required" and opens your terminal
+  running that CLI's login (`claude auth login`, `codex login`,
+  `cursor-agent login`).
+- The robot turns **red** while any limit is at 90% or more.
 
 Collector cache: `~/Library/Caches/Agents`. App logs:
 `log show --predicate 'subsystem == "Agents"' --last 1h`.
