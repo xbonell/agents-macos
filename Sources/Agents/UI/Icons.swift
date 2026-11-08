@@ -21,10 +21,16 @@ enum Icons {
     return image
   }
 
+  // Marks this port draws in place of Omarchy's: Codex's cloud loses its >_
+  // at 24pt and sits off-centre in its frame, so Codex shows OpenAI's mark
+  // (assets/openai.svg, from LobeHub's MIT icon set like Omarchy's own).
+  static let substitutes: [String: String] = ["codex": "openai"]
+
   // Panel.qml's iconCandidatesForProvider: the light twin first on a light
   // surface, then the plain mark.
   static func mark(for id: String, scheme: ColorScheme) -> NSImage? {
-    (scheme == .light ? image(named: "\(id)-light") : nil) ?? image(named: id)
+    let name = substitutes[id] ?? id
+    return (scheme == .light ? image(named: "\(name)-light") : nil) ?? image(named: name)
   }
 
   // The bar glyph, U+F16A3 from Material Design Icons, as a template image
@@ -40,21 +46,32 @@ enum Icons {
   }()
 }
 
-// A provider's mark, falling back to the bar glyph when it ships none.
+// A provider's mark as a small app icon: the mark on a white tile with the
+// continuous corners of Apple's icon grid (radius ≈ 22.4% of the tile) and
+// the mark inset to its central ~62%. The tile is always white, so the mark
+// is always the variant drawn for light surfaces; the bar glyph stands in
+// for a provider that ships none.
 struct ProviderMark: View {
   let id: String
-  var size: CGFloat = 18
-  @Environment(\.colorScheme) private var scheme
+  var size: CGFloat = 24
 
   var body: some View {
-    Group {
-      if let mark = Icons.mark(for: id, scheme: scheme) {
-        Image(nsImage: mark).resizable().interpolation(.high)
-      } else {
-        Image(nsImage: Icons.robot).resizable().foregroundStyle(.primary)
+    let tile = RoundedRectangle(cornerRadius: size * 0.2237, style: .continuous)
+    ZStack {
+      tile
+        .fill(.white)
+        .shadow(color: .black.opacity(0.18), radius: 1, y: 0.5)
+      Group {
+        if let mark = Icons.mark(for: id, scheme: .light) {
+          Image(nsImage: mark).resizable().interpolation(.high)
+        } else {
+          Image(nsImage: Icons.robot).resizable().foregroundStyle(.black.opacity(0.85))
+        }
       }
+      .aspectRatio(contentMode: .fit)
+      .padding(size * 0.19)
     }
-    .aspectRatio(contentMode: .fit)
+    .overlay(tile.strokeBorder(.black.opacity(0.08), lineWidth: 0.5))
     .frame(width: size, height: size)
   }
 }
