@@ -69,6 +69,27 @@ scripts/build-app.sh --install  # and copy it to ~/Applications
 Collector cache: `~/Library/Caches/Agents`. App logs:
 `log show --predicate 'subsystem == "Agents"' --last 1h`.
 
+## Sharing it
+
+There's no Developer ID signature, so the easiest way for someone else to run
+it is to build it themselves; an app built on their own Mac isn't quarantined
+and opens without a Gatekeeper prompt:
+
+```sh
+git clone git@github.com:xbonell/agents-macos.git && cd agents-macos
+scripts/build-app.sh --install
+```
+
+To send a built copy instead, zip it so the signature survives
+(`ditto -c -k --keepParent dist/Agents.app Agents.zip`). macOS blocks it the
+first time it's opened: allow it under System Settings › Privacy & Security ›
+Open Anyway, or run `xattr -dr com.apple.quarantine /Applications/Agents.app`.
+
+Either way it needs macOS 14 or later on Apple silicon (the build is arm64
+only), Apple's Command Line Tools for `/usr/bin/python3`, and each agent's CLI
+signed in; macOS may ask once to allow Keychain access for the Claude and
+Cursor tokens.
+
 ## Development
 
 ```sh
@@ -80,17 +101,39 @@ Collector cache: `~/Library/Caches/Agents`. App logs:
 
 # Point the panel at other records (sample data)
 AGENTS_USAGE_DIR=/path/to/records .build/debug/Agents --snapshot panel.png
-
-# Pull collector and mark updates from an Omarchy checkout
-scripts/sync-upstream.sh ~/Work/99.misc/omarchy
 ```
 
 `@State` is avoided: on the Command Line Tools, SwiftUI's macro plugin is
 missing and `@State` doesn't build. View-local state uses `@StateObject`.
 
+## Updating from Omarchy
+
+Omarchy's collectors change often, and this port carries copies of them. To
+take upstream fixes:
+
+1. `scripts/check-upstream.sh --fetch` fetches your Omarchy checkout (default
+   `~/Work/99.misc/omarchy`, or pass a path) and lists which vendored files
+   differ from its tracked branch, plus the upstream commits that touched them
+   since the last sync. It never changes the checkout's files. Without
+   `--fetch` it compares with the checkout's files as they are; `--ref <ref>`
+   compares with any ref (`upstream/master` if your checkout is a fork).
+2. Update the checkout itself (`git pull`), then `scripts/sync-upstream.sh`
+   copies the files over and records the revision.
+3. `swift build`, run each collector with `run_collector.py … --force | jq`
+   and look for errors or a changed record, draw a `--snapshot`, then
+   `scripts/build-app.sh --install`.
+
+A change that breaks on macOS gets its fix in `macos/macos_shim.py`, never in
+the vendored files.
+
 ## Not ported yet
 
-Other providers (each needs its collector copied in `sync-upstream.sh`, its id
-in `Scheduler.providers`, and any shim it needs), multiple accounts and
+Other providers (each needs its id in `PROVIDERS` in `scripts/upstream.sh`, a
+sync, its id in `Scheduler.providers`, and any shim it needs), multiple accounts and
 autoswitch, the add-subscription sign-in flow, starter prompts, reordering,
 and cross-device sync.
+
+## License
+
+MIT, see [LICENSE](LICENSE), which also credits Omarchy (the collectors and
+the design this ports), LobeHub Icons (the OpenAI mark), and tomli.

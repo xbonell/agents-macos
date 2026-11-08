@@ -15,6 +15,7 @@ swift build                       # debug build
 swift run                         # run from source (no Dock icon)
 scripts/build-app.sh              # release build → dist/Agents.app, ad-hoc signed
 scripts/build-app.sh --install    # and copy it to ~/Applications
+scripts/check-upstream.sh [--fetch] [--ref <ref>] [omarchy-checkout]   # vendored files vs Omarchy; exit 1 when out of date
 scripts/sync-upstream.sh [omarchy-checkout]   # re-copy collectors + SVG marks from Omarchy
 scripts/make-icon.sh              # regenerate Icon/AppIcon.icns (robot on a tile); build-app.sh bundles it
 
@@ -100,4 +101,4 @@ There are two halves, split the same way as upstream: Python collectors write on
 
 ## Adding a provider
 
-Add its id to `PROVIDERS` in `scripts/sync-upstream.sh` and re-sync, then add it to `Scheduler.providers`. Run the collector by itself, and add any macOS path or Keychain differences to `macos_shim.py`. An `assets/<id>.svg` mark is optional; the robot stands in for a missing one. Add its display name to `SettingsView.names`, and its login command to `Presentation.signInCommands` if it has one.
+Add its id to `PROVIDERS` in `scripts/upstream.sh` (shared by the sync and check scripts) and re-sync, then add it to `Scheduler.providers`. Run the collector by itself, and add any macOS path or Keychain differences to `macos_shim.py`. An `assets/<id>.svg` mark is optional; the robot stands in for a missing one. Add its display name to `SettingsView.names`, and its login command to `Presentation.signInCommands` if it has one.
