@@ -8,7 +8,8 @@
 #   scripts/check-upstream.sh --ref upstream/master   # against any ref (fetch it first)
 #   scripts/check-upstream.sh [options] /path/to/omarchy
 #
-# Exits 0 when everything matches, 1 when there's something to sync.
+# Exits 0 when everything matches, 1 when there's something to sync, 2 when
+# there's no checkout.
 set -euo pipefail
 
 source "$(dirname "$0")/upstream.sh"
@@ -26,6 +27,7 @@ while (( $# > 0 )); do
   shift
 done
 
+require_checkout "$UPSTREAM"
 git_up() { git -C "$UPSTREAM" "$@"; }
 
 if (( FETCH )); then

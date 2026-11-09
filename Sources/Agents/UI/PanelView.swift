@@ -78,7 +78,8 @@ struct PanelView: View {
       Divider().padding(.vertical, 4)
       Footer(
         updated: Presentation.updatedText(store.visible, now: now, running: scheduler?.running ?? false),
-        openSettings: openSettings
+        openSettings: openSettings,
+        snapshot: scheduler == nil
       )
     }
     .padding(Theme.panelPadding)
@@ -99,6 +100,9 @@ private struct ContentHeightKey: PreferenceKey {
 private struct Footer: View {
   let updated: String
   let openSettings: () -> Void
+  // ImageRenderer can't draw a borderless Menu, so a snapshot gets the bare
+  // gear in its place.
+  let snapshot: Bool
 
   var body: some View {
     HStack {
@@ -106,18 +110,26 @@ private struct Footer: View {
         .font(Theme.secondary)
         .foregroundStyle(.secondary)
       Spacer()
-      Menu {
-        Button("Settings…", action: openSettings)
-        Divider()
-        Button("Quit Agents") { NSApplication.shared.terminate(nil) }
-      } label: {
+      if snapshot {
         Image(systemName: "gearshape")
+      } else {
+        menu
       }
-      .menuStyle(.borderlessButton)
-      .menuIndicator(.hidden)
-      .fixedSize()
-      .help("Settings and Quit")
     }
     .padding(.horizontal, 4)
+  }
+
+  private var menu: some View {
+    Menu {
+      Button("Settings…", action: openSettings)
+      Divider()
+      Button("Quit Agents") { NSApplication.shared.terminate(nil) }
+    } label: {
+      Image(systemName: "gearshape")
+    }
+    .menuStyle(.borderlessButton)
+    .menuIndicator(.hidden)
+    .fixedSize()
+    .help("Settings and Quit")
   }
 }

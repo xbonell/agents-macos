@@ -7,6 +7,7 @@ set -euo pipefail
 
 source "$(dirname "$0")/upstream.sh"
 UPSTREAM="${1:-$UPSTREAM_DEFAULT}"
+require_checkout "$UPSTREAM"
 RESOURCES="$(cd "$(dirname "$0")/.." && pwd)/Sources/Agents/Resources"
 
 while read -r from to; do

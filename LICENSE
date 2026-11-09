@@ -27,7 +27,7 @@ Third-party software
 This project includes work from the following projects, each under the MIT
 License (the same terms as above, with their own copyright notices):
 
-- Omarchy (https://github.com/basecamp/omarchy)
+- Omarchy (https://github.com/omacom/omarchy)
   Copyright (c) David Heinemeier Hansson
   The usage collectors in Sources/Agents/Resources/collectors/, the provider
   marks in Sources/Agents/Resources/assets/ that come from it, the bar glyph
@@ -42,6 +42,7 @@ License (the same terms as above, with their own copyright notices):
   Copyright (c) 2021 Taneli Hukkinen
   Sources/Agents/Resources/macos/vendor/tomli/, with its own LICENSE there.
 
-The Claude, OpenAI, Cursor, and OpenCode names and marks are trademarks of
-their respective owners. They're used only to label each service's usage, and
-this project isn't affiliated with or endorsed by any of them.
+The Claude, OpenAI, Cursor, Grok, and OpenCode names and marks are
+trademarks of their respective owners. They're used only to label each
+service's usage, and this project isn't affiliated with or endorsed by any
+of them.

@@ -4,7 +4,7 @@ Guidance for AI coding agents working in this repository.
 
 ## What this is
 
-A native macOS menu bar app (an AppKit `NSStatusItem` with SwiftUI views, macOS 14+) that ports Omarchy's `omarchy.agents` panel: rate limits, reset times, and token stats for AI coding subscriptions. The upstream plugin lives at `~/Work/99.misc/omarchy/shell/plugins/agents` (QML panel), with its collectors at `~/Work/99.misc/omarchy/bin/omarchy-agent-usage-*`. The record format is `omarchy/docs/agent-usage-collectors.md`. It covers Claude Code, Codex, Cursor, Grok Bot (metered apart from Cursor on the same account; hidden without an allowance), and OpenCode (Zen/Go; hidden until used).
+A native macOS menu bar app (an AppKit `NSStatusItem` with SwiftUI views, macOS 14+) that ports Omarchy's `omarchy.agents` panel: rate limits, reset times, and token stats for AI coding subscriptions. Upstream is [omacom/omarchy](https://github.com/omacom/omarchy); the scripts find a local checkout at `$OMARCHY_CHECKOUT` (default `~/Work/99.misc/omarchy`). The plugin is its `shell/plugins/agents` (QML panel), with its collectors at `bin/omarchy-agent-usage-*`, and the record format is its `docs/agent-usage-collectors.md`. It covers Claude Code, Codex, Cursor, Grok Bot (metered apart from Cursor on the same account; hidden without an allowance), and OpenCode (Zen/Go; hidden until used).
 
 ## Commands
 
@@ -24,7 +24,8 @@ scripts/make-icon.sh              # regenerate Icon/AppIcon.icns (robot on a til
 
 # Render the panel to a PNG without running collectors (the only way to check UI without screen access)
 .build/debug/Agents --snapshot /path/out.png [--dark]
-AGENTS_USAGE_DIR=/dir/with/sample/records .build/debug/Agents --snapshot /path/out.png
+scripts/make-samples.py /dir      # made-up records for every provider, resets relative to now
+AGENTS_USAGE_DIR=/dir .build/debug/Agents --snapshot /path/out.png [-AppleLocale en_US]
 
 # Print the limit notifications the records would trigger (remembered in the
 # com.xbonell.agents.dryrun defaults domain; `defaults delete` it to start over)
@@ -39,7 +40,7 @@ defaults write com.xbonell.agents disabledProviders -array cursor  # providers s
 defaults write com.xbonell.agents notifyNearLimit -bool false      # limit notifications
 ```
 
-There is no test target. Verify collector changes by running `run_collector.py`, and UI changes with `--snapshot`. When swapping a running instance, kill it by pid, then `open dist/Agents.app`.
+There is no test target. Verify collector changes by running `run_collector.py`, and UI changes with `--snapshot`. `docs/panel.png` and `docs/panel-dark.png` (the README's screenshots) are `--snapshot`s of `make-samples.py`'s records with `-AppleLocale en_US`; re-render them after a visible change. Don't run the app itself (`swift run`) with `AGENTS_USAGE_DIR` set to samples: its scheduler runs the real collectors and overwrites them. When swapping a running instance, kill it by pid, then `open dist/Agents.app`.
 
 ## Architecture
 
@@ -95,7 +96,7 @@ There are two halves, split the same way as upstream: Python collectors write on
 - **Panel sizing**: the panel window follows the hosting controller's `preferredContentSize`, which is the content's ideal height. Don't wrap the content in `ViewThatFits` or a fixed-height `ScrollView`, or the window grows to that frame. `PanelView` measures the content and switches to a `ScrollView` only past `Theme.maxPanelHeight`.
 - **A notification that doesn't show** is usually a Focus mode holding banners, not a bug: the `notify` log category records each post (`Notified: …`) and, at launch, the settings macOS reports for Agents (authorization, alert style, banners, Notification Center).
 - `PanelView` stays alive between openings, so `.onAppear` fires once: put per-opening work in `StatusBarController.showPanel()`.
-- **`--snapshot` uses `ImageRenderer`**: it can't draw AppKit-backed controls (`ScrollView`, `ProgressView`, `.borderless` buttons, checkboxes), which come out blank or as a yellow 🚫 placeholder. That's why meters are drawn shapes, not `ProgressView`. Tooltips (`.help`) and the real material background aren't visible in snapshots either.
+- **`--snapshot` uses `ImageRenderer`**: it can't draw AppKit-backed controls (`ScrollView`, `ProgressView`, `.borderless` buttons, checkboxes), which come out blank or as a yellow 🚫 placeholder. That's why meters are drawn shapes, not `ProgressView`, and why the footer's gear menu is a bare image when there's no scheduler (snapshot mode). Tooltips (`.help`) and the real material background aren't visible in snapshots either.
 - **Icons**: in the panel each mark sits on a white app-icon tile (`ProviderMark`), always using the dark-ink `-light.svg` variant. `Icons.substitutes` swaps a mark that doesn't hold up at 24 pt for another asset: Codex shows `assets/openai.svg` (OpenAI's mark from LobeHub's MIT icon set, added by this port, so `sync-upstream.sh` leaves it alone). `NSImage` reads the SVG marks natively. `Icons.image(named:)` scales marks with tiny declared sizes (Codex's `1em`) up to a 64 pt working size. The menu bar robot (`assets/robot.svg`, the Omarchy bar glyph U+F16A3, regenerated with `scripts/extract-glyph.swift`, which needs a Nerd Font) is then pinned to 16 pt high as a template image.
 - `SwiftPM` resources live in `Sources/Agents/Resources` (copied as `Bundle.module`). `build-app.sh` places `Agents_Agents.bundle` in `Contents/Resources`, where the generated accessor looks first.
 

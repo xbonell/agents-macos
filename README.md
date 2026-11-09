@@ -1,9 +1,18 @@
 # Agents for macOS
 
-A native macOS menu bar port of Omarchy's `omarchy.agents` panel: one robot
-in the menu bar, and a panel with each AI subscription's rate limits, reset
-times, and what your token counts add up to: Claude Code, Codex, Cursor, and
+A native macOS menu bar port of [Omarchy](https://github.com/omacom/omarchy)'s
+`omarchy.agents` panel: one robot in the menu bar, and a panel with each AI
+subscription's rate limits, reset times, and what your token counts add up
+to: Claude Code, Codex, Cursor, Grok Bot (included with Cursor and metered
+apart from it; the card appears when your account has an allowance), and
 OpenCode (its own Zen/Go service; the card appears once you use it).
+
+<p align="center">
+  <img src="docs/panel.png#gh-light-mode-only" width="320" alt="The panel: cards for Claude Code, Codex, Cursor, Grok Bot, and OpenCode, each with its limits">
+  <img src="docs/panel-dark.png#gh-dark-mode-only" width="320" alt="The panel in dark mode">
+</p>
+
+<sub>Drawn from made-up records (`scripts/make-samples.py`).</sub>
 
 ## How it works
 
@@ -13,7 +22,7 @@ that split:
 
 - **Collectors** are Omarchy's own, vendored unmodified in
   `Sources/Agents/Resources/collectors/` (`collectors.py` plus
-  `omarchy-agent-usage-{claude,codex,cursor,opencode}`). Their record format is
+  `omarchy-agent-usage-{claude,codex,cursor,grokbot,opencode}`). Their record format is
   Omarchy's `docs/agent-usage-collectors.md`.
 - **`Resources/macos/run_collector.py`** runs one of them on macOS:
   it points `OMARCHY_PATH`, `XDG_STATE_HOME` and `XDG_CACHE_HOME` at the app's
@@ -61,13 +70,26 @@ scripts/build-app.sh --install  # and copy it to ~/Applications
   running as `Agents.app`.
 - **Sign In…** appears next to "Sign-in required" and opens your terminal
   running that CLI's login (`claude auth login`, `codex login`,
-  `cursor-agent login`).
+  `cursor-agent login` for both Cursor and Grok Bot, `opencode auth login`).
 - The robot turns **red** while any limit is at 90% or more, and a
   **notification** says so once per window (switch it off in Settings).
   Clicking the notification opens the panel.
 
 Collector cache: `~/Library/Caches/Agents`. App logs:
 `log show --predicate 'subsystem == "Agents"' --last 1h`.
+
+## Privacy
+
+- Credentials are only ever read, never written or refreshed: Claude Code's
+  and cursor-agent's tokens from the Keychain (macOS may ask once to allow
+  it), the others from each agent's own files, and the Cursor editor's
+  sign-in from its database.
+- Each token goes only to its own provider: Claude Code's to
+  `api.anthropic.com`, Cursor's (also used for Grok Bot) to `api2.cursor.sh`,
+  OpenCode's to `opencode.ai`. Codex's limits come from the `codex` CLI
+  itself. The app makes no network requests of its own.
+- The records the panel draws stay on your Mac, in
+  `~/Library/Application Support/Agents`. There's no telemetry or analytics.
 
 ## Sharing it
 
@@ -76,7 +98,7 @@ it is to build it themselves; an app built on their own Mac isn't quarantined
 and opens without a Gatekeeper prompt:
 
 ```sh
-git clone git@github.com:xbonell/agents-macos.git && cd agents-macos
+git clone https://github.com/xbonell/agents-macos.git && cd agents-macos
 scripts/build-app.sh --install
 ```
 
@@ -99,9 +121,13 @@ Cursor tokens.
 # Draw the panel into a PNG without running collectors
 .build/debug/Agents --snapshot panel.png [--dark]
 
-# Point the panel at other records (sample data)
-AGENTS_USAGE_DIR=/path/to/records .build/debug/Agents --snapshot panel.png
+# Made-up records for every provider, for UI work without signing in anywhere
+scripts/make-samples.py /tmp/agents-samples
+AGENTS_USAGE_DIR=/tmp/agents-samples .build/debug/Agents --snapshot panel.png
 ```
+
+The README's screenshots are `--snapshot`s of those samples, rendered with
+`-AppleLocale en_US`.
 
 `@State` is avoided: on the Command Line Tools, SwiftUI's macro plugin is
 missing and `@State` doesn't build. View-local state uses `@StateObject`.
@@ -111,8 +137,10 @@ missing and `@State` doesn't build. View-local state uses `@StateObject`.
 Omarchy's collectors change often, and this port carries copies of them. To
 take upstream fixes:
 
-1. `scripts/check-upstream.sh --fetch` fetches your Omarchy checkout (default
-   `~/Work/99.misc/omarchy`, or pass a path) and lists which vendored files
+1. `scripts/check-upstream.sh --fetch` fetches your Omarchy checkout (clone
+   [omacom/omarchy](https://github.com/omacom/omarchy) anywhere and pass its
+   path or set `OMARCHY_CHECKOUT`; the default is `~/Work/99.misc/omarchy`)
+   and lists which vendored files
    differ from its tracked branch, plus the upstream commits that touched them
    since the last sync. It never changes the checkout's files. Without
    `--fetch` it compares with the checkout's files as they are; `--ref <ref>`
@@ -132,6 +160,11 @@ Other providers (each needs its id in `PROVIDERS` in `scripts/upstream.sh`, a
 sync, its id in `Scheduler.providers`, and any shim it needs), multiple accounts and
 autoswitch, the add-subscription sign-in flow, starter prompts, reordering,
 and cross-device sync.
+
+## Contributing
+
+Issues and pull requests are welcome; [CONTRIBUTING.md](CONTRIBUTING.md) has
+the ground rules, and [AGENTS.md](AGENTS.md) explains how it's put together.
 
 ## License
 
