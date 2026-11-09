@@ -4,7 +4,7 @@ Guidance for AI coding agents working in this repository.
 
 ## What this is
 
-A native macOS menu bar app (an AppKit `NSStatusItem` with SwiftUI views, macOS 14+) that ports Omarchy's `omarchy.agents` panel: rate limits, reset times, and token stats for AI coding subscriptions. The upstream plugin lives at `~/Work/99.misc/omarchy/shell/plugins/agents` (QML panel), with its collectors at `~/Work/99.misc/omarchy/bin/omarchy-agent-usage-*`. The record format is `omarchy/docs/agent-usage-collectors.md`. It covers Claude Code, Codex, Cursor, and OpenCode (Zen/Go; hidden until used).
+A native macOS menu bar app (an AppKit `NSStatusItem` with SwiftUI views, macOS 14+) that ports Omarchy's `omarchy.agents` panel: rate limits, reset times, and token stats for AI coding subscriptions. The upstream plugin lives at `~/Work/99.misc/omarchy/shell/plugins/agents` (QML panel), with its collectors at `~/Work/99.misc/omarchy/bin/omarchy-agent-usage-*`. The record format is `omarchy/docs/agent-usage-collectors.md`. It covers Claude Code, Codex, Cursor, Grok Bot (metered apart from Cursor on the same account; hidden without an allowance), and OpenCode (Zen/Go; hidden until used).
 
 ## Commands
 

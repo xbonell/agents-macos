@@ -10,7 +10,7 @@ struct SettingsView: View {
   @ObservedObject var login: LoginItem
 
   private static let intervals = [300, 600, 900, 1800, 3600]
-  private static let names = ["claude": "Claude Code", "codex": "Codex", "cursor": "Cursor", "opencode": "OpenCode"]
+  private static let names = ["claude": "Claude Code", "codex": "Codex", "cursor": "Cursor", "grokbot": "Grok Bot", "opencode": "OpenCode"]
 
   var body: some View {
     Form {
