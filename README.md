@@ -14,6 +14,8 @@ OpenCode (its own Zen/Go service; the card appears once you use it).
 
 <sub>Drawn from made-up records (`scripts/make-samples.py`).</sub>
 
+Prefer the terminal, or on Linux? [agents-tui](https://github.com/xbonell/agents-tui) is the same panel as a TUI, and it can display this app's records instead of collecting again.
+
 ## How it works
 
 The Omarchy plugin is split into collectors (Python) that write one JSON
