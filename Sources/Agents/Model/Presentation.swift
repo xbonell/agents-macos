@@ -146,6 +146,11 @@ enum Presentation {
     "cursor": "cursor-agent login",
     "grokbot": "cursor-agent login",
     "opencode": "opencode auth login",
+    "copilot": "gh auth login",
+    "devin": "devin auth login",
+    "grok": "grok login",
+    "kimi": "kimi login",
+    "muse": "muse login",
   ]
 
   static func planLabel(_ record: UsageRecord) -> String {

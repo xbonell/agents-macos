@@ -4,7 +4,7 @@ Guidance for AI coding agents working in this repository.
 
 ## What this is
 
-A native macOS menu bar app (an AppKit `NSStatusItem` with SwiftUI views, macOS 14+) that ports Omarchy's `omarchy.agents` panel: rate limits, reset times, and token stats for AI coding subscriptions. Upstream is [omacom/omarchy](https://github.com/omacom/omarchy); the scripts find a local checkout at `$OMARCHY_CHECKOUT` (default `~/Work/99.misc/omarchy`). The plugin is its `shell/plugins/agents` (QML panel), with its collectors at `bin/omarchy-agent-usage-*`, and the record format is its `docs/agent-usage-collectors.md`. It covers Claude Code, Codex, Cursor, Grok Bot (metered apart from Cursor on the same account; hidden without an allowance), and OpenCode (Zen/Go; hidden until used).
+A native macOS menu bar app (an AppKit `NSStatusItem` with SwiftUI views, macOS 14+) that ports Omarchy's `omarchy.agents` panel: rate limits, reset times, and token stats for AI coding subscriptions. Upstream is [omacom/omarchy](https://github.com/omacom/omarchy); the scripts find a local checkout at `$OMARCHY_CHECKOUT` (default `~/Work/99.misc/omarchy`). The plugin is its `shell/plugins/agents` (QML panel), with its collectors at `bin/omarchy-agent-usage-*`, and the record format is its `docs/agent-usage-collectors.md`. It vendors every collector Omarchy has: Claude Code, Codex, Cursor, Grok Bot (metered apart from Cursor on the same account), OpenCode (Zen/Go), Antigravity (`agy`, Google's Gemini plan), GitHub Copilot, DeepSeek, Devin, Fireworks, Grok, Hermes, Kimchi, Kimi, Local models, MiniMax, Muse, Ollama Cloud, OpenRouter, Qwen Code, Synthetic, Mistral Vibe and Z.ai. Each is hidden until it has data (upstream's `providerHasData`).
 
 ## Commands
 
@@ -24,7 +24,7 @@ scripts/make-icon.sh              # regenerate Icon/AppIcon.icns (robot on a til
 
 # Render the panel to a PNG without running collectors (the only way to check UI without screen access)
 .build/debug/Agents --snapshot /path/out.png [--dark]
-scripts/make-samples.py /dir      # made-up records for every provider, resets relative to now
+scripts/make-samples.py [--only claude,codex] /dir   # made-up records for every provider, resets relative to now
 AGENTS_USAGE_DIR=/dir .build/debug/Agents --snapshot /path/out.png [-AppleLocale en_US]
 
 # Print the limit notifications the records would trigger (remembered in the
@@ -40,7 +40,7 @@ defaults write com.xbonell.agents disabledProviders -array cursor  # providers s
 defaults write com.xbonell.agents notifyNearLimit -bool false      # limit notifications
 ```
 
-There is no test target. Verify collector changes by running `run_collector.py`, and UI changes with `--snapshot`. `docs/panel.png` and `docs/panel-dark.png` (the README's screenshots) are `--snapshot`s of `make-samples.py`'s records with `-AppleLocale en_US`; re-render them after a visible change. Don't run the app itself (`swift run`) with `AGENTS_USAGE_DIR` set to samples: its scheduler runs the real collectors and overwrites them. When swapping a running instance, kill it by pid, then `open dist/Agents.app`.
+There is no test target. Verify collector changes by running `run_collector.py`, and UI changes with `--snapshot`. `docs/panel.png` and `docs/panel-dark.png` (the README's screenshots) are `--snapshot`s of `make-samples.py --only claude,codex,cursor,grokbot,opencode` with `-AppleLocale en_US`; re-render them after a visible change. Every provider together passes `Theme.maxPanelHeight`, and the `ScrollView` comes out blank in a snapshot, so check the rest a few at a time with `--only`. Don't run the app itself (`swift run`) with `AGENTS_USAGE_DIR` set to samples: its scheduler runs the real collectors and overwrites them. When swapping a running instance, kill it by pid, then `open dist/Agents.app`.
 
 ## Architecture
 
@@ -54,7 +54,7 @@ There are two halves, split the same way as upstream: Python collectors write on
   - It installs the vendored `macos/vendor/tomli` as `tomllib`, because the system Python is 3.9.6 and nothing else in the collectors needs a newer version.
   - It then imports `collectors`, applies the shim, and `runpy`s the collector script.
 - The shim monkeypatches names on the `collectors` module **before** the collector script runs, so the script's `from collectors import …` picks up the patched versions. Current patches:
-  - `read_json` falls back to the Keychain: `Claude Code-credentials` for `.credentials.json`, and `cursor-access-token` for cursor-agent's `auth.json`.
+  - `read_json` falls back to the Keychain: `Claude Code-credentials` for `.credentials.json`, `cursor-access-token` for cursor-agent's `auth.json`, and service `gemini`/account `antigravity` for agy's `antigravity-oauth-token` (on Linux agy's collector asks `secret-tool` first).
   - `cursor_state_db` points at `~/Library/Application Support/Cursor/...`.
   Credentials are only ever read, as the collector contract requires.
 - Collectors must never write into the app bundle, or the signature breaks. `-I` and `sys.dont_write_bytecode` keep `__pycache__` out.
@@ -63,7 +63,7 @@ There are two halves, split the same way as upstream: Python collectors write on
 - `Collect/CollectorRunner.swift` replaces upstream's bash `omarchy-agent-usage-update`, which needs bash 4:
   - It runs the collectors in parallel through `/usr/bin/python3 -I run_collector.py <id>`, with a 120 s kill.
   - It checks that stdout is a JSON object, then writes `<usageDir>/<id>.json` atomically (tmp file plus `rename`).
-  - GUI apps get launchd's bare `PATH`, so `SearchPath` merges the login shell's `PATH` with the usual install folders. The collectors need `codex` and `rg`.
+  - GUI apps get launchd's bare environment. `LoginShell` captures the login shell's environment once (`env -0`) and it's merged under the app's own, so API keys exported in a shell profile (`OPENROUTER_API_KEY`, `ZAI_API_KEY`…) reach the collectors. `SearchPath` merges that `PATH` with the usual install folders; the collectors need `codex` and `rg`.
 - `Collect/Scheduler.swift` ports `Main.qml`'s refresh logic:
   - A full refresh every `refreshIntervalSec` (default 900, triggered on start), and every 180 s near a limit for multi-account agents.
   - `--limits-only` when the panel opens, `--force` from the refresh button.
@@ -82,7 +82,7 @@ There are two halves, split the same way as upstream: Python collectors write on
 - `StatusBarController.swift` owns the menu bar item. It's AppKit because SwiftUI's `MenuBarExtra` can't tell right clicks from left:
   - Left click toggles `PanelWindow`, a borderless non-activating `NSPanel` (popover material, 10 pt corners) hosting `PanelView` through an `NSHostingController` with `.preferredContentSize`, positioned under the robot. A click outside (global monitor) or Esc closes it, and opening it runs a limits refresh.
   - Right click shows an `NSMenu` (Refresh, Settings…, Open at Login, Quit). The red alarm robot is a non-template image, re-evaluated through `withObservationTracking` on `store.visible` and once a minute.
-  - It also owns the Settings window (`UI/SettingsView.swift`, a grouped `Form` in a plain `NSWindow`, not a SwiftUI `Settings` scene).
+  - It also owns the Settings window (`UI/SettingsView.swift`, a grouped `Form` in a plain `NSWindow`, not a SwiftUI `Settings` scene; the form scrolls itself, and the window, resizable in height only, opens at `SettingsView.preferredHeight` or the screen's height if that's smaller). Its provider toggles list detected providers (a record with `hasData`) first; the rest sit in a collapsed "Not detected" group. Every provider is on by default, because running its collector is how it gets detected..
 - `LimitNotifier.swift` posts `notificationsDue`'s alerts with `UNUserNotificationCenter`, re-evaluating through `withObservationTracking` on `store.visible`. What's been sent is kept in `UserDefaults` (`notifiedLimits`, seeded on first launch so nothing old fires) and tracked even while notifications are off. Clicking one opens the panel. It's inert unless bundled: `UNUserNotificationCenter` crashes under `swift run`.
 - `Preferences.swift` is the `@Observable` settings model over `UserDefaults` (`refreshIntervalSec`, `disabledProviders`, `notifyNearLimit`). An interval change restarts the scheduler's wait without an extra run. `AgentsApp.swift` is an AppKit `@main` that builds preferences, store, scheduler and controller; `--snapshot` exits before any UI is created.
 - `Theme.swift` and `UI/` are the view layer. It follows **Control Center style** rather than Omarchy's look: a card per provider, 13/11 pt system text, and accent-colored meters that turn red at ≥ 90%. Model-scoped allowances show as labelled sub-rows under their window, not as Omarchy's unlabelled ticks.

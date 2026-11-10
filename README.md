@@ -4,8 +4,12 @@ A native macOS menu bar port of [Omarchy](https://github.com/omacom/omarchy)'s
 `omarchy.agents` panel: one robot in the menu bar, and a panel with each AI
 subscription's rate limits, reset times, and what your token counts add up
 to: Claude Code, Codex, Cursor, Grok Bot (included with Cursor and metered
-apart from it; the card appears when your account has an allowance), and
-OpenCode (its own Zen/Go service; the card appears once you use it).
+apart from it; the card appears when your account has an allowance),
+OpenCode (its own Zen/Go service), and every other provider Omarchy collects:
+Antigravity (Google's Gemini plan), GitHub Copilot, DeepSeek, Devin,
+Fireworks, Grok, Hermes, Kimchi, Kimi, local models, MiniMax, Muse, Ollama
+Cloud, OpenRouter, Qwen Code, Synthetic, Mistral Vibe, and Z.ai. A card
+appears only once its provider has something to show.
 
 <p align="center">
   <img src="docs/panel.png#gh-light-mode-only" width="320" alt="The panel: cards for Claude Code, Codex, Cursor, Grok Bot, and OpenCode, each with its limits">
@@ -24,14 +28,16 @@ that split:
 
 - **Collectors** are Omarchy's own, vendored unmodified in
   `Sources/Agents/Resources/collectors/` (`collectors.py` plus
-  `omarchy-agent-usage-{claude,codex,cursor,grokbot,opencode}`). Their record format is
+  `omarchy-agent-usage-<id>` for each provider). Their record format is
   Omarchy's `docs/agent-usage-collectors.md`.
 - **`Resources/macos/run_collector.py`** runs one of them on macOS:
   it points `OMARCHY_PATH`, `XDG_STATE_HOME` and `XDG_CACHE_HOME` at the app's
   folders, gives the system Python 3.9 the vendored `tomli` as `tomllib`, and
-  applies `macos_shim.py`, which reads Claude Code's and cursor-agent's
-  tokens from the Keychain (read only) and Cursor's editor database from
-  `~/Library/Application Support`.
+  applies `macos_shim.py`, which reads Claude Code's, cursor-agent's and
+  Antigravity's sign-ins from the Keychain (read only) and Cursor's editor
+  database from `~/Library/Application Support`. Collectors also get your
+  login shell's environment, so an API key exported in your shell profile
+  (`OPENROUTER_API_KEY`, `DEEPSEEK_API_KEY`, `ZAI_API_KEY`…) reaches them.
 - **The app** (an AppKit menu bar item with a SwiftUI panel) runs the collectors with
   `/usr/bin/python3`, writes each record atomically to
   `~/Library/Application Support/Agents/omarchy/agents/usage/`, watches that
@@ -68,11 +74,14 @@ scripts/build-app.sh --install  # and copy it to ~/Applications
 - **Right-click** it (or Control-click) for Refresh, Settings…, Open at Login,
   and Quit. The gear in the panel's footer has Settings… and Quit too.
 - **Settings** sets how often to refresh (5 minutes to 1 hour; default 15) and
-  which providers to collect and show. Open at Login is offered only when
+  which providers to collect and show. Every provider is on by default; ones
+  not detected yet sit in a collapsed group and appear by themselves once used. Open at Login is offered only when
   running as `Agents.app`.
 - **Sign In…** appears next to "Sign-in required" and opens your terminal
   running that CLI's login (`claude auth login`, `codex login`,
-  `cursor-agent login` for both Cursor and Grok Bot, `opencode auth login`).
+  `cursor-agent login` for both Cursor and Grok Bot, `opencode auth login`,
+  `gh auth login` for Copilot, `devin auth login`, `grok login`, `kimi login`,
+  `muse login`).
 - The robot turns **red** while any limit is at 90% or more, and a
   **notification** says so once per window (switch it off in Settings).
   Clicking the notification opens the panel.
@@ -82,14 +91,16 @@ Collector cache: `~/Library/Caches/Agents`. App logs:
 
 ## Privacy
 
-- Credentials are only ever read, never written or refreshed: Claude Code's
-  and cursor-agent's tokens from the Keychain (macOS may ask once to allow
-  it), the others from each agent's own files, and the Cursor editor's
-  sign-in from its database.
+- Credentials are only ever read, never written or refreshed: Claude Code's,
+  cursor-agent's and Antigravity's tokens from the Keychain (macOS may ask
+  once to allow it), API keys from your shell's environment, the others from
+  each agent's own files, and the Cursor editor's sign-in from its database.
 - Each token goes only to its own provider: Claude Code's to
   `api.anthropic.com`, Cursor's (also used for Grok Bot) to `api2.cursor.sh`,
-  OpenCode's to `opencode.ai`. Codex's limits come from the `codex` CLI
-  itself. The app makes no network requests of its own.
+  OpenCode's to `opencode.ai`, and so on for the others (see Omarchy's
+  `shell/plugins/agents/README.md` for each one's endpoint). Codex's limits
+  come from the `codex` CLI itself. The app makes no network requests of its
+  own.
 - The records the panel draws stay on your Mac, in
   `~/Library/Application Support/Agents`. There's no telemetry or analytics.
 

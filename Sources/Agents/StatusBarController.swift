@@ -182,11 +182,16 @@ final class StatusBarController: NSObject {
     if settingsWindow == nil {
       let view = SettingsView(prefs: prefs, store: store, scheduler: scheduler, notifier: notifier, login: login)
       let hosting = NSHostingController(rootView: view)
-      hosting.sizingOptions = [.preferredContentSize]
+      hosting.sizingOptions = []
       let window = NSWindow(contentViewController: hosting)
       window.title = "Agents Settings"
-      window.styleMask = [.titled, .closable]
+      // Resizable in height only; it opens no taller than the screen allows.
+      window.styleMask = [.titled, .closable, .resizable]
       window.isReleasedWhenClosed = false
+      let available = (NSScreen.main?.visibleFrame.height ?? SettingsView.preferredHeight) - 80
+      window.setContentSize(NSSize(width: SettingsView.width, height: min(SettingsView.preferredHeight, available)))
+      window.contentMinSize = NSSize(width: SettingsView.width, height: 300)
+      window.contentMaxSize = NSSize(width: SettingsView.width, height: .greatestFiniteMagnitude)
       window.center()
       settingsWindow = window
     }

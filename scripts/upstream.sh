@@ -1,7 +1,7 @@
 # Shared by sync-upstream.sh and check-upstream.sh: where the Omarchy
 # checkout is, and which of its collectors this port vendors.
 UPSTREAM_DEFAULT="${OMARCHY_CHECKOUT:-$HOME/Work/99.misc/omarchy}"
-PROVIDERS=(claude codex cursor grokbot opencode)
+PROVIDERS=(claude codex cursor grokbot opencode agy copilot deepseek devin fireworks grok hermes kimchi kimi local minimax muse ollama openrouter qwen synthetic vibe zai)
 
 # The upstream paths vendored, relative to the Omarchy checkout, each with
 # where it lands relative to Sources/Agents/Resources.

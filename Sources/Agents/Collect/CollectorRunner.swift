@@ -93,7 +93,9 @@ enum CollectorRunner {
         let process = Process()
         process.executableURL = Paths.python
         process.arguments = arguments
-        var env = ProcessInfo.processInfo.environment
+        // The login shell's exports (API keys, *_HOME overrides) fill in
+        // what launchd left out; the app's own environment wins.
+        var env = LoginShell.environment.merging(ProcessInfo.processInfo.environment) { _, own in own }
         env["PATH"] = SearchPath.value
         env["XDG_STATE_HOME"] = Paths.stateHome.path
         env["XDG_CACHE_HOME"] = Paths.cacheHome.path
@@ -151,7 +153,7 @@ private final class LockedData: @unchecked Sendable {
 enum SearchPath {
   static let value: String = {
     let home = Paths.home.path
-    var parts = loginShellPath().split(separator: ":").map(String.init)
+    var parts = (LoginShell.environment["PATH"] ?? "").split(separator: ":").map(String.init)
     parts += [
       "/opt/homebrew/bin", "/opt/homebrew/sbin", "/usr/local/bin",
       "\(home)/.local/bin", "\(home)/.npm-global/bin", "\(home)/.bun/bin", "\(home)/.cargo/bin",
@@ -162,22 +164,34 @@ enum SearchPath {
     var seen = Set<String>()
     return parts.filter { !$0.isEmpty && seen.insert($0).inserted }.joined(separator: ":")
   }()
+}
 
-  private static func loginShellPath() -> String {
+// launchd also leaves out what shell profiles export, such as the API keys
+// several collectors read from the environment. Taken once from the login
+// shell, empty when it fails or takes over 5 s.
+enum LoginShell {
+  static let environment: [String: String] = {
     let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
     let process = Process()
     process.executableURL = URL(fileURLWithPath: shell)
-    process.arguments = ["-lc", "printf %s \"$PATH\""]
+    process.arguments = ["-lc", "/usr/bin/env -0"]
     process.standardInput = FileHandle.nullDevice
     process.standardError = FileHandle.nullDevice
     let out = Pipe()
     process.standardOutput = out
-    guard (try? process.run()) != nil else { return "" }
+    guard (try? process.run()) != nil else { return [:] }
     DispatchQueue.global().asyncAfter(deadline: .now() + 5) {
       if process.isRunning { process.terminate() }
     }
     let data = out.fileHandleForReading.readDataToEndOfFile()
     process.waitUntilExit()
-    return process.terminationStatus == 0 ? String(decoding: data, as: UTF8.self) : ""
-  }
+    guard process.terminationStatus == 0 else { return [:] }
+    var env: [String: String] = [:]
+    for entry in data.split(separator: 0) {
+      let line = String(decoding: entry, as: UTF8.self)
+      guard let eq = line.firstIndex(of: "="), eq != line.startIndex else { continue }
+      env[String(line[..<eq])] = String(line[line.index(after: eq)...])
+    }
+    return env
+  }()
 }
